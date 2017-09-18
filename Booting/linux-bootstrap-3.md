@@ -281,7 +281,7 @@ static int vga_set_mode(struct mode_info *mode)
 
 在显卡的显示模式被正确设置之后，这个最终的显示模式被写回  `boot_params.hdr.vid_mode`。
 
-接下来 `set_video` 函数将调用 `vesa_store_edid` 函数， 这个函数只是简单的将  [EDID](https://en.wikipedia.org/wiki/Extended_Display_Identification_Data) (**E**xtended **D**isplay **I**dentification **D**ata) 写入内存，以便于内核访问。最后， `set_video` 将调用 `do_restore` 函数将前面保存的当前屏幕信息还原到屏幕上。
+接下来 `set_video` 函数将调用 `vesa_store_edid` 函数， 这个函数只是简单的将  [EDID](https://en.wikipedia.org/wiki/Extended_Display_Identification_Data) (**E**xtended **D**isplay **I**dentification **D**ata) 写入内存，以便于内核访问。最后， `set_video` 判断`do_restore`置位没有，如果置位了将前面保存的当前屏幕信息还原到屏幕上。
 
 到这里为止，显示模式的设置完成，接下来我们可以切换到保护模式了。
 
