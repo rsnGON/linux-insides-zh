@@ -532,7 +532,7 @@ protected_mode_jump(boot_params.hdr.code32_start, (u32)&boot_params + (ds() << 4
 
 第一个参数保存在 `eax` 寄存器，而第二个参数保存在 `edx` 寄存器。
 
-代码首先在 `boot_params` 地址放入 `esi` 寄存器，然后将 `cs` 寄存器内容放入 `bx` 寄存器，接着执行 `bx << 4 + 标号为2的代码的地址`，这样一来 `bx` 寄存器就包含了标号为2的代码的地址。接下来代码将把数据段索引放入 `cx` 寄存器，将  TSS 段索引放入 `di` 寄存器：
+首先，代码把 `boot_params` 地址放入 `esi` 寄存器，然后将 `cs` 寄存器内容放入 `bx` 寄存器，接着执行 `bx << 4 + 标号为2的代码的地址`，这样一来 `bx` 寄存器就包含了标号为2的代码的地址。接下来代码将把数据段索引放入 `cx` 寄存器，将  TSS 段索引放入 `di` 寄存器：
 
 ```assembly
 movw	$__BOOT_DS, %cx
