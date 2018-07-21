@@ -4,7 +4,7 @@
 从引导加载程序内核
 --------------------------------------------------------------------------------
 
-如果看过我在这之前的[文章](http://0xax.blogspot.com/search/label/asm)，你就会知道我已经开始涉足底层的代码编写。我写了一些关于 Linux x86_64  汇编的文章。同时，我开始深入研究 Linux 源代码。底层是如果工作的，程序是如何在电脑上运行的，它们是如何在内存中定位的，内核是如何管理进程和内存，网络堆栈是如何在底层工作的等等，这些我都非常感兴趣。因此，我决定去写另外的一系列文章关于 **x86_64** 框架的 Linux 内核。
+如果看过我在这之前的[文章](http://0xax.blogspot.com/search/label/asm)，你就会知道我已经开始涉足底层的代码编写。我写了一些关于 Linux x86_64  汇编的文章。同时，我开始深入研究 Linux 源代码。底层是如何工作的，程序是如何在电脑上运行的，它们是如何在内存中定位的，内核是如何管理进程和内存，网络堆栈是如何在底层工作的等等，这些我都非常感兴趣。因此，我决定去写另外的一系列文章关于 **x86_64** 框架的 Linux 内核。
 
 *注意这不是官方文档，只是学习和分享知识*
 
@@ -72,25 +72,27 @@ PhysicalAddress = Segment * 16 + Offset
 得到的 `0xfffffff0` 是 4GB - 16 字节。 这个地方是 [复位向量(Reset vector)](http://en.wikipedia.org/wiki/Reset_vector) 。 这是CPU在重置后期望执行的第一条指令的内存地址。它包含一个 [jump](http://en.wikipedia.org/wiki/JMP_%28x86_instruction%29) 指令，这个指令通常指向BIOS入口点。举个例子，如果访问 [coreboot](http://www.coreboot.org/) 源代码，将看到：
 
 ```assembly
-	.section ".reset"
+	.section ".reset", "ax", %progbits
 	.code16
-.globl	reset_vector
-reset_vector:
+.globl	_start
+_start:
 	.byte  0xe9
-	.int   _start - ( . + 2 )
+	.int   _start16bit - ( . + 2 )
 	...
 ```
 
-上面的跳转指令（ [opcode](http://ref.x86asm.net/coder32.html#xE9) - 0xe9）跳转到地址  `_start - ( . + 2)` 去执行代码。 `reset` 段是16字节代码段， 起始于地址 
-`0xfffffff0`，因此 CPU 复位之后，就会跳到这个地址来执行相应的代码 ：
+上面的跳转指令（ [opcode](http://ref.x86asm.net/coder32.html#xE9) - 0xe9）跳转到地址  `_start16bit - ( . + 2)` 去执行代码。 `reset` 段是 `16` 字节代码段， 起始于地址 
+`0xfffffff0`(`src/cpu/x86/16bit/reset16.ld`)，因此 CPU 复位之后，就会跳到这个地址来执行相应的代码 ：
 
 ```
 SECTIONS {
+	/* Trigger an error if I have an unuseable start address */
+ 	_bogus = ASSERT(_start16bit >= 0xffff0000, "_start16bit too low. Please report.");
 	_ROMTOP = 0xfffffff0;
 	. = _ROMTOP;
 	.reset . : {
-		*(.reset)
-		. = 15 ;
+		*(.reset);
+		. = 15;
 		BYTE(0x00);
 	}
 }
@@ -141,7 +143,7 @@ nasm -f bin boot.nasm
 objdump -D -b binary -mi386 -Maddr16,data16,intel boot
 ```
 
-一个真实的启动扇区包含了分区表，已经用来启动系统的指令，而不是像我们上面的程序，只是输出了一个感叹号就结束了。从启动扇区的代码被执行开始，BIOS 就将系统的控制权转移给了引导程序，让我们继续往下看看引导程序都做了些什么。
+一个真实的启动扇区包含了分区表，以及用来启动系统的指令，而不是像我们上面的程序，只是输出了一个感叹号就结束了。从启动扇区的代码被执行开始，BIOS 就将系统的控制权转移给了引导程序，让我们继续往下看看引导程序都做了些什么。
 
 **NOTE**: 强调一点，上面的引导程序是运行在实模式下的，因此 CPU 是使用下面的公式进行物理地址的计算的：
 
@@ -324,7 +326,7 @@ fs = es = ds = ss = 0x1000
 cs = 0x1020
 ```
 
-从 `start_of_setup` 标号开是的代码需要完成下面这些事情：
+从 `start_of_setup` 标号开始的代码需要完成下面这些事情：
 
 * 将所有段寄存器的值设置成一样的内容
 * 设置堆栈
@@ -440,7 +442,7 @@ BSS 段用来存储那些没有被初始化的静态变量。对于这个段使�
 	rep; stosl
 ```
 
-在这段代码中，首先将 [__bss_start](http://lxr.free-electrons.com/source/arch/x86/boot/setup.ld?v=3.18#L47) 地址放入 `di` 寄存器，然后将 `_end + 3` （4字节对齐） 地址放入 `cx`，接着使用 `xor` 指令将 `ax` 寄存器清零，接着计算 BSS 段的大小 （ `cx` - `di` ），让后将大小放入 `cx` 寄存器。接下来将 `cx` 寄存器除4，最后使用 `rep; stosl` 指令将 `ax` 寄存器的值（0）写入 寄存器整个 BSS 段。 代码执行完成之后，我们将得到如下图所示的 BSS 段:
+在这段代码中，首先将 [__bss_start](http://lxr.free-electrons.com/source/arch/x86/boot/setup.ld?v=3.18#L47) 地址放入 `di` 寄存器，然后将 `_end + 3` （4字节对齐） 地址放入 `cx`，接着使用 `xor` 指令将 `ax` 寄存器清零，接着计算 BSS 段的大小 （ `cx` - `di` ），然后将大小放入 `cx` 寄存器。接下来将 `cx` 寄存器除4，最后使用 `rep; stosl` 指令将 `ax` 寄存器的值（0）写入 寄存器整个 BSS 段。 代码执行完成之后，我们将得到如下图所示的 BSS 段:
 
 ![bss](http://oi59.tinypic.com/29m2eyr.jpg)
 
